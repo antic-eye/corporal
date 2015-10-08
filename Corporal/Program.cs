@@ -26,17 +26,16 @@ namespace Corporal
                 .AddHandler(new DebugConsoleLoggerHandler());
 #endif
             Logger.DefaultLevel = Logger.Level.Debug;
+
+            LoadBanner();
+
             Logger.Log("Parsing arguments");
             var configuration = CommandLineParserConfigurator
                 .Create()
                     .WithNamed("f", v => inputFile = v)
                         .HavingLongAlias("file")
                         .Required()
-                        //.RestrictedTo(ShortOutput, LongOutput)
                         .DescribedBy("Input File", "specifies the input file to parse.")
-                    //.WithNamed("t", (int v) => threshold = v)
-                    //    .HavingLongAlias("threshold")
-                    //    .DescribedBy("value", "specifies the threshold used in output.")
                     .WithSwitch("t", () => tag = true)
                         .HavingLongAlias("tag")
                         .DescribedBy("Tag your texts using TreeTagger")
@@ -55,6 +54,7 @@ namespace Corporal
                 Logger.Log(Logger.Level.Error,
                     string.Format("The file {0} does not exist, I'm out.", inputFile));
                 ShowUsage(configuration, parseResult);
+                Environment.ExitCode = -2;
             }
             else
             {
@@ -75,6 +75,47 @@ namespace Corporal
 #endif
         }
 
+        private static void LoadBanner()
+        {
+            Console.Write(@"
+                               ``                   
+                              ```                   
+                             `````                  
+                            ```-.``                 
+                           ```:dh-```               
+                          ```/dmmh:```              
+                         ``.odmmmmd/```             
+                       ```-ymmmdmmmms.```           
+                      ``.+dmmmh-/dmmmh/```          
+                    ```:ymmmdo...-smmmds-```        
+                  ```-sdmmmy:`/hh:`/hmmmdo.```      
+                ```-sdmmmd/.-ymmmds..+dmmmdo.```    
+              ```-sdmmmd+..odmmmmmmd+..odmmmdo-```  
+            ``./ydmmmd+..+dmmmh/+dmmmh/.-odmmmdy:.``
+            ``smmmmh/..odmmmh+.``.+dmmmh+..+dmmmm+``
+            ``ymds:`:sdmmmh+.``````.odmmmdo-./ydm+``
+            ``+/../ymmmmh/.```    ```.+hmmmdy/.-+/``
+            ``./sdmmmds:````        ```./ydmmmdo:.``
+            ``smmmmh+.````            ````-ohmmmm+``
+            ``ymho-````                  ````:odm+``
+            ``/-````                       ````.::``
+            ``````                            ``````
+            ``                                    ``
+
+
+ .o88b.  .d88b.  d8888b. d8888b.  .d88b.  d8888b.  .d8b.  db     
+d8P  Y8 .8P  Y8. 88  `8D 88  `8D .8P  Y8. 88  `8D d8' `8b 88     
+8P      88    88 88oobY' 88oodD' 88    88 88oobY' 88ooo88 88     
+8b      88    88 88`8b   88~~~   88    88 88`8b   88~~~88 88     
+Y8b  d8 `8b  d8' 88 `88. 88      `8b  d8' 88 `88. 88   88 88booo.
+ `Y88P'  `Y88P'  88   YD 88       `Y88P'  88   YD YP   YP Y88888P
+
+                         Stand Still!!!
+
+
+");
+        }
+
         private static void FillCorpus()
         {
             corpus.Attributes.Add("created", DateTime.Now);
@@ -85,22 +126,28 @@ namespace Corporal
             int iCell = 0;
             int iTextCell = -1;
             foreach (var worksheet in Workbook.Worksheets(inputFile))
+            {
+                Logger.Log(string.Format("Reading {0} row(s). ", worksheet.Rows.Length));
                 foreach (var row in worksheet.Rows)
                 {
                     Text text = new Text();
                     text.TagTheText = tag;
+                    Logger.Log(string.Format("Reading {0} cells(s). ", row.Cells.Length));
                     foreach (var cell in row.Cells)
                     {
                         if (cell != null)
                         {
                             if (iRow == 0)//GetHeaders
                             {
+                                Logger.Log(string.Format("Found attribute {0}. ", cell.Text));
                                 attributes.Add(iCell, cell.Text);
                                 if (cell.Text == "text")
+                                {
+                                    Logger.Log(string.Format("Found text cell @ column {0}. ", iCell));
                                     iTextCell = iCell;
+                                }
                             }
-                            else
-                                if (iCell == iTextCell && !String.IsNullOrEmpty(cell.Text))
+                            else if (iCell == iTextCell && !String.IsNullOrEmpty(cell.Text))
                                 text.Content = string.Format("{0}{1}{0}", Environment.NewLine, cell.Text);
                             else
                                 text.Attributes.Add(attributes[iCell], cell.Text);
@@ -112,6 +159,8 @@ namespace Corporal
                     iRow++;
                     iCell = 0;
                 }
+            }
+            Logger.Log("Finished reading excel file.");
         }
 
         private static void ShowUsage(CommandLineConfiguration configuration, ParseResult parseResult)
