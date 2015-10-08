@@ -9,6 +9,8 @@ Run the Corporal using the following commandline:
 
 	corporal.exe -f "myFile.xslx" -v -t
 
+|Option | Description |
+| -------- | -------------- |
 | -f $FILE | The file to be read |
 | -v | Verbose output |
 | -t | Tag with TreeTagger |
