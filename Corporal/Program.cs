@@ -1,4 +1,5 @@
 ﻿using Appccelerate.CommandLineParser;
+using Excel;
 using SimpleLogger;
 using SimpleLogger.Logging.Handlers;
 using System;
@@ -10,11 +11,12 @@ namespace Corporal
 {
     class Program
     {
-        static Queue<Task> queue = new Queue<Task>();
-        static string inputFile = null;
-        static bool verbose = false;
+        private static Queue<Task> queue = new Queue<Task>();
+        private static string inputFile = null;
+        private static bool verbose = false;
+        private static Corpus corpus = new Corpus();
 
-        static void Main(string[] args)
+        public static void Main(string[] args)
         {
             // Adding handler - to show log messages (ILoggerHandler)
             Logger.LoggerHandlerManager
@@ -22,6 +24,7 @@ namespace Corporal
 #if DEBUG
                 .AddHandler(new DebugConsoleLoggerHandler());
 #endif
+            Logger.DefaultLevel = Logger.Level.Debug;
             Logger.Log("Parsing arguments");
             var configuration = CommandLineParserConfigurator
                 .Create()
@@ -43,23 +46,67 @@ namespace Corporal
 
             if (!parseResult.Succeeded)
                 ShowUsage(configuration, parseResult);
-            else if(!File.Exists(inputFile))
+            else if (!File.Exists(inputFile))
             {
-                Logger.Log(Logger.Level.Error, 
+                Logger.Log(Logger.Level.Error,
                     string.Format("The file {0} does not exist, I'm out.", inputFile));
                 ShowUsage(configuration, parseResult);
             }
             else
             {
-                Logger.Log(string.Format("Reading document {0}", inputFile));
+                if (!verbose)
+                    Logger.DebugOff();
+                else
+                    Logger.DebugOn();
 
+                Logger.Log(string.Format("Reading document {0}", inputFile));
+                FillCorpus();
+
+                corpus.ToXml(inputFile + ".xml");
             }
 
+            Logger.Log(string.Format("[DEBUG] Exiting with: " + Environment.ExitCode));
 #if DEBUG
-            Logger.Log(Logger.Level.Error,
-                string.Format("[DEBUG] Exiting with: " + Environment.ExitCode));
             Console.ReadLine();
 #endif
+        }
+
+        private static void FillCorpus()
+        {
+            corpus.Attributes.Add("created", DateTime.Now);
+            corpus.Attributes.Add("author", Environment.UserName);
+
+            Dictionary<int, string> attributes = new Dictionary<int, string>();
+            int iRow = 0;
+            int iCell = 0;
+            int iTextCell = -1;
+            foreach (var worksheet in Workbook.Worksheets(inputFile))
+                foreach (var row in worksheet.Rows)
+                {
+                    Text text = new Text();
+                    foreach (var cell in row.Cells)
+                    {
+                        if (cell != null)
+                        {
+                            if (iRow == 0)//GetHeaders
+                            {
+                                attributes.Add(iCell, cell.Text);
+                                if (cell.Text == "text")
+                                    iTextCell = iCell;
+                            }
+                            else
+                                if (iCell == iTextCell && !String.IsNullOrEmpty(cell.Text))
+                                text.Content = string.Format("{0}{1}{0}", Environment.NewLine, cell.Text);
+                            else
+                                text.Attributes.Add(attributes[iCell], cell.Text);
+                        }
+                        iCell++;
+                    }
+                    if (iRow > 0)
+                        corpus.Texts.Add(text);
+                    iRow++;
+                    iCell = 0;
+                }
         }
 
         private static void ShowUsage(CommandLineConfiguration configuration, ParseResult parseResult)
