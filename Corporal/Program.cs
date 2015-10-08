@@ -14,6 +14,7 @@ namespace Corporal
         private static Queue<Task> queue = new Queue<Task>();
         private static string inputFile = null;
         private static bool verbose = false;
+        private static bool tag = false;
         private static Corpus corpus = new Corpus();
 
         public static void Main(string[] args)
@@ -36,6 +37,9 @@ namespace Corporal
                     //.WithNamed("t", (int v) => threshold = v)
                     //    .HavingLongAlias("threshold")
                     //    .DescribedBy("value", "specifies the threshold used in output.")
+                    .WithSwitch("t", () => tag = true)
+                        .HavingLongAlias("tag")
+                        .DescribedBy("Tag your texts using TreeTagger")
                     .WithSwitch("v", () => verbose = true)
                         .HavingLongAlias("verbose")
                         .DescribedBy("enables verbose output")
@@ -65,7 +69,7 @@ namespace Corporal
                 corpus.ToXml(inputFile + ".xml");
             }
 
-            Logger.Log(string.Format("[DEBUG] Exiting with: " + Environment.ExitCode));
+            Logger.Log(string.Format("Exiting with: " + Environment.ExitCode));
 #if DEBUG
             Console.ReadLine();
 #endif
@@ -84,6 +88,7 @@ namespace Corporal
                 foreach (var row in worksheet.Rows)
                 {
                     Text text = new Text();
+                    text.TagTheText = tag;
                     foreach (var cell in row.Cells)
                     {
                         if (cell != null)

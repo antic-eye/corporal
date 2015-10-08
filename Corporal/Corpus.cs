@@ -2,8 +2,11 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
 
@@ -35,6 +38,7 @@ namespace Corporal
                 settings.NewLineChars = Environment.NewLine;
                 settings.NewLineHandling = NewLineHandling.None;
                 settings.WriteEndDocumentOnClose = true;
+                settings.Encoding = Encoding.UTF8;
 
                 using (XmlWriter writer = XmlWriter.Create(path, settings))
                 {
@@ -47,6 +51,7 @@ namespace Corporal
                         writer.WriteStartElement("text");
                         foreach (DictionaryEntry attr in text.Attributes)
                             writer.WriteAttributeString(attr.Key.ToString(), attr.Value.ToString());
+                        writer.WriteString(Environment.NewLine);
                         writer.WriteString(text.Content);
                         writer.WriteEndElement();
                     }
@@ -65,6 +70,7 @@ namespace Corporal
         private Hashtable attributes = new Hashtable();
         private string content = string.Empty;
 
+        public bool TagTheText { get; set; }
         public Hashtable Attributes
         {
             get { return attributes; }
@@ -76,10 +82,48 @@ namespace Corporal
             {
                 return content;
             }
-            set{
-                content = value.Replace(" ", Environment.NewLine);
-                foreach (string s in new string[] { ".", "," })
-                    content = content.Replace(s, Environment.NewLine + s + Environment.NewLine);
+            set
+            {
+                if (this.TagTheText)
+                    TagText(value);
+                else
+                    content = value;
+            }
+        }
+        public void TagText(string content)
+        {
+            string sTempFile = Path.GetTempFileName();
+            using (TextWriter writer = new StreamWriter(sTempFile))
+            {
+                writer.Write(content);
+                writer.Close();
+            }
+            using (Process p = new Process())
+            {
+                p.StartInfo = new ProcessStartInfo();
+                p.StartInfo.FileName = @"E:\ITI-Projekte_NoBackup\Corporal\TreeTagger\bin\tag-german.bat";
+                p.StartInfo.Arguments = "\"" + sTempFile + "\"";
+                p.StartInfo.CreateNoWindow = true;
+                p.StartInfo.RedirectStandardOutput = true;
+                p.StartInfo.RedirectStandardError = true;
+                p.StartInfo.UseShellExecute = false;
+                p.StartInfo.StandardOutputEncoding = Encoding.UTF8;
+
+                if (p.Start())
+                {
+                    while (!p.HasExited)
+                    {
+                        Thread.Sleep(500);
+                    }
+
+                    string stdOut = p.StandardOutput.ReadToEnd();
+                    string stdErr = p.StandardError.ReadToEnd();
+
+                    if (p.ExitCode == 0)
+                        this.content = stdOut;
+                    else
+                        throw new Exception(stdErr);
+                }
             }
         }
     }
