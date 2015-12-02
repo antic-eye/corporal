@@ -5,7 +5,10 @@ using SimpleLogger.Logging.Handlers;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
+using System.Xml;
 
 namespace Corporal
 {
@@ -19,6 +22,43 @@ namespace Corporal
 
         public static void Main(string[] args)
         {
+            Regexify(@"E:\ITI-Projekte_NoBackup\Corporal\data\speech-acts");
+            //uint i = 80000;
+            //System.Collections.BitArray b = new System.Collections.BitArray(new int[] { (int)i });
+
+            //int length = b.Length;
+            //int mid = (length / 2);
+
+            //for (int k = 0; k < mid; k++)
+            //{
+            //    bool bit = b[k];
+            //    b[k] = b[length - k - 1];
+            //    b[length - k - 1] = bit;
+            //}
+
+
+            //int y = 0;
+            //int iPos = -1;
+
+            //foreach (bool bit in b)
+            //{
+            //    if (bit)
+            //    {
+            //        iPos = y;
+            //        break;
+            //    }
+            //    y++;
+            //}
+
+            //uint j = i; int pos = 0; // r will be lg(v)  
+            //while ((j>>=1)>0) { pos++; }
+
+
+            //var s = "abc$def"; 
+            //Console.WriteLine(s);
+
+            //return;
+
             // Adding handler - to show log messages (ILoggerHandler)
             Logger.LoggerHandlerManager
                 .AddHandler(new ConsoleLoggerHandler())
@@ -140,7 +180,7 @@ Y8b  d8 `8b  d8' 88 `88. 88      `8b  d8' 88 `88. 88   88 88booo.
                             if (iRow == 0)//GetHeaders
                             {
                                 Logger.Log(string.Format("Found attribute {0}. ", cell.Text));
-                                attributes.Add(iCell, cell.Text);
+                                attributes.Add(iCell, cell.Text.Replace(" ", string.Empty));
                                 if (cell.Text == "text")
                                 {
                                     Logger.Log(string.Format("Found text cell @ column {0}. ", iCell));
