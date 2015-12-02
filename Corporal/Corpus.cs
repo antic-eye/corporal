@@ -117,8 +117,16 @@ namespace Corporal
                 if (this.TagTheText)
                     TagText(value);
                 else
+                {
+                    FindSpeechAct();
                     content = value;
+                }
             }
+        }
+
+        public void FindSpeechAct()
+        {
+
         }
         /// <summary>
         /// This function calls the TreeTagger.
@@ -139,7 +147,7 @@ namespace Corporal
             using (Process p = new Process())
             {
                 p.StartInfo = new ProcessStartInfo();
-                p.StartInfo.FileName = @"E:\ITI-Projekte_NoBackup\Corporal\TreeTagger\bin\tag-german.bat";
+                p.StartInfo.FileName = "tag-german.bat";
                 p.StartInfo.Arguments = "\"" + sTempFile + "\"";
                 p.StartInfo.CreateNoWindow = true;
                 p.StartInfo.RedirectStandardOutput = true;
