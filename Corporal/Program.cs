@@ -22,43 +22,6 @@ namespace Corporal
 
         public static void Main(string[] args)
         {
-            Regexify(@"E:\ITI-Projekte_NoBackup\Corporal\data\speech-acts");
-            //uint i = 80000;
-            //System.Collections.BitArray b = new System.Collections.BitArray(new int[] { (int)i });
-
-            //int length = b.Length;
-            //int mid = (length / 2);
-
-            //for (int k = 0; k < mid; k++)
-            //{
-            //    bool bit = b[k];
-            //    b[k] = b[length - k - 1];
-            //    b[length - k - 1] = bit;
-            //}
-
-
-            //int y = 0;
-            //int iPos = -1;
-
-            //foreach (bool bit in b)
-            //{
-            //    if (bit)
-            //    {
-            //        iPos = y;
-            //        break;
-            //    }
-            //    y++;
-            //}
-
-            //uint j = i; int pos = 0; // r will be lg(v)  
-            //while ((j>>=1)>0) { pos++; }
-
-
-            //var s = "abc$def"; 
-            //Console.WriteLine(s);
-
-            //return;
-
             // Adding handler - to show log messages (ILoggerHandler)
             Logger.LoggerHandlerManager
                 .AddHandler(new ConsoleLoggerHandler())
@@ -104,9 +67,10 @@ namespace Corporal
                     Logger.DebugOn();
 
                 Logger.Log(string.Format("Reading document {0}", inputFile));
-                FillCorpus();
-
-                corpus.ToXml(inputFile + ".xml");
+                if (!FillCorpus())
+                    Environment.ExitCode = 403;
+                else
+                    corpus.ToXml(inputFile + ".xml");
             }
 
             Logger.Log(string.Format("Exiting with: " + Environment.ExitCode));
@@ -156,7 +120,7 @@ Y8b  d8 `8b  d8' 88 `88. 88      `8b  d8' 88 `88. 88   88 88booo.
 ");
         }
 
-        private static void FillCorpus()
+        private static bool FillCorpus()
         {
             corpus.Attributes.Add("created", DateTime.Now);
             corpus.Attributes.Add("author", Environment.UserName);
@@ -165,42 +129,52 @@ Y8b  d8 `8b  d8' 88 `88. 88      `8b  d8' 88 `88. 88   88 88booo.
             int iRow = 0;
             int iCell = 0;
             int iTextCell = -1;
-            foreach (var worksheet in Workbook.Worksheets(inputFile))
+
+            try
             {
-                Logger.Log(string.Format("Reading {0} row(s). ", worksheet.Rows.Length));
-                foreach (var row in worksheet.Rows)
+                foreach (var worksheet in Workbook.Worksheets(inputFile))
                 {
-                    Text text = new Text();
-                    text.TagTheText = tag;
-                    Logger.Log(string.Format("Reading {0} cells(s). ", row.Cells.Length));
-                    foreach (var cell in row.Cells)
+                    Logger.Log(string.Format("Reading {0} row(s). ", worksheet.Rows.Length));
+                    foreach (var row in worksheet.Rows)
                     {
-                        if (cell != null)
+                        Text text = new Text();
+                        text.TagTheText = tag;
+                        Logger.Log(string.Format("Reading {0} cells(s). ", row.Cells.Length));
+                        foreach (var cell in row.Cells)
                         {
-                            if (iRow == 0)//GetHeaders
+                            if (cell != null)
                             {
-                                Logger.Log(string.Format("Found attribute {0}. ", cell.Text));
-                                attributes.Add(iCell, cell.Text.Replace(" ", string.Empty));
-                                if (cell.Text == "text")
+                                if (iRow == 0)//GetHeaders
                                 {
-                                    Logger.Log(string.Format("Found text cell @ column {0}. ", iCell));
-                                    iTextCell = iCell;
+                                    Logger.Log(string.Format("Found attribute {0}. ", cell.Text));
+                                    attributes.Add(iCell, cell.Text.Replace(" ", string.Empty));
+                                    if (cell.Text.ToLowerInvariant() == "text")
+                                    {
+                                        Logger.Log(string.Format("Found text cell @ column {0}. ", iCell));
+                                        iTextCell = iCell;
+                                    }
                                 }
+                                else if (iCell == iTextCell && !String.IsNullOrEmpty(cell.Text))
+                                    text.Content = string.Format("{0}{1}{0}", Environment.NewLine, cell.Text);
+                                else
+                                    text.Attributes.Add(attributes[iCell], cell.Text);
                             }
-                            else if (iCell == iTextCell && !String.IsNullOrEmpty(cell.Text))
-                                text.Content = string.Format("{0}{1}{0}", Environment.NewLine, cell.Text);
-                            else
-                                text.Attributes.Add(attributes[iCell], cell.Text);
+                            iCell++;
                         }
-                        iCell++;
+                        if (iRow > 0)
+                            corpus.Texts.Add(text);
+                        iRow++;
+                        iCell = 0;
                     }
-                    if (iRow > 0)
-                        corpus.Texts.Add(text);
-                    iRow++;
-                    iCell = 0;
                 }
             }
+            catch (IOException ex)
+            {
+                Logger.Log(ex);
+                return false;
+            }
             Logger.Log("Finished reading excel file.");
+            return true;
         }
 
         private static void ShowUsage(CommandLineConfiguration configuration, ParseResult parseResult)
