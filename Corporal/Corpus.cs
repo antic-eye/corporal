@@ -2,10 +2,14 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
@@ -19,7 +23,8 @@ namespace Corporal
     public class Corpus
     {
         private Hashtable attributes = new Hashtable();
-        private List<Text> texts = new List<Text>();
+        private TrulyObservableCollection<Text> texts = new TrulyObservableCollection<Text>();
+        private int tokenCount = 0;
         /// <summary>
         /// COntains metadata of the corpus
         /// </summary>
@@ -31,11 +36,23 @@ namespace Corporal
         /// <summary>
         /// Contains a list of texts that are part of the corpus.
         /// </summary>
-        public List<Text> Texts
+        public TrulyObservableCollection<Text> Texts
         {
-            get { return texts; }
-            set { texts = value; }
+            get { return this.texts; }
+            set {
+                this.texts = value;
+            }
         }
+        public Corpus()
+        {
+            texts.CollectionChanged += Texts_CollectionChanged;
+        }
+
+        private void Texts_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+        {
+            tokenCount = this.texts.Sum(x => x.TokenCount);
+        }
+
         /// <summary>
         /// Save texts to a xml file
         /// </summary>
@@ -149,10 +166,12 @@ namespace Corporal
     /// <summary>
     /// The Text element contains the rows of an Excel file as texts with attributes.
     /// </summary>
-    public class Text
+    public class Text : INotifyPropertyChanged
     {
         private Hashtable attributes = new Hashtable();
         private string content = string.Empty;
+        private int tokenCount = 0;
+
         /// <summary>
         /// Controls if the content of a Text element should e tagged or not.
         /// </summary>
@@ -178,14 +197,46 @@ namespace Corporal
             }
             set
             {
-                if (this.TagTheText)
-                    TagText(value);
-                else
-                {
-                    FindSpeechAct();
-                    content = value;
+                //if (this.TagTheText)
+                //TagText(value);
+                //else
+                //{
+                //    FindSpeechAct();
+                content = value;
+                PropertyChanged(this, new PropertyChangedEventArgs("content"));
+                try {
+                    tokenCount = 0;
+                    foreach (char c in this.content.ToCharArray())
+                        if (c == ' ')
+                            tokenCount++;
+                    if (this.attributes.ContainsKey("tokenCount"))
+                        this.attributes["tokenCount"] = this.tokenCount;
+                    else
+                        this.attributes.Add("tokenCount", this.tokenCount);
                 }
+                catch(Exception ex) { Logger.Log(ex); }
+                //}
             }
+        }
+        public int TokenCount
+        {
+            get
+            {
+                return this.tokenCount;
+            }
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        public Text()
+        {
+            this.PropertyChanged += Text_PropertyChanged;
+            
+        }
+
+        private void Text_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            Logger.Log(Level.Debug, "Changed " + e.PropertyName);
         }
 
         public void FindSpeechAct()
@@ -243,6 +294,46 @@ namespace Corporal
                     }
                 }
             }
+        }
+    }
+    public sealed class TrulyObservableCollection<T> : ObservableCollection<T>
+    where T : INotifyPropertyChanged
+    {
+        public TrulyObservableCollection()
+        {
+            CollectionChanged += FullObservableCollectionCollectionChanged;
+        }
+
+        public TrulyObservableCollection(IEnumerable<T> pItems) : this()
+        {
+            foreach (var item in pItems)
+            {
+                this.Add(item);
+            }
+        }
+
+        private void FullObservableCollectionCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+        {
+            if (e.NewItems != null)
+            {
+                foreach (Object item in e.NewItems)
+                {
+                    ((INotifyPropertyChanged)item).PropertyChanged += ItemPropertyChanged;
+                }
+            }
+            if (e.OldItems != null)
+            {
+                foreach (Object item in e.OldItems)
+                {
+                    ((INotifyPropertyChanged)item).PropertyChanged -= ItemPropertyChanged;
+                }
+            }
+        }
+
+        private void ItemPropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            NotifyCollectionChangedEventArgs args = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, sender, sender, IndexOf((T)sender));
+            OnCollectionChanged(args);
         }
     }
 }
