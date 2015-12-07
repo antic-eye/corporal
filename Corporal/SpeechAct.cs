@@ -44,6 +44,7 @@ namespace Corporal
         }
         private static string Prepare(string sentence)
         {
+            SimpleLogger.Logger.Log(string.Format("Preparing sentence\"{0}\"", sentence));
             // convert matching syntax to regex
             sentence = sentence.Replace(" . ", @" .* ");          // Find commas with or without spaces
             sentence = sentence.Replace("...", @" .* ");          // Match everything here

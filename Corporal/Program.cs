@@ -7,8 +7,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Xml;
+using static SimpleLogger.Logger;
 
 namespace Corporal
 {
@@ -134,28 +136,27 @@ Y8b  d8 `8b  d8' 88 `88. 88      `8b  d8' 88 `88. 88   88 88booo.
             {
                 foreach (var worksheet in Workbook.Worksheets(inputFile))
                 {
-                    Logger.Log(string.Format("Reading {0} row(s). ", worksheet.Rows.Length));
                     foreach (var row in worksheet.Rows)
                     {
                         Text text = new Text();
                         text.TagTheText = tag;
-                        Logger.Log(string.Format("Reading {0} cells(s). ", row.Cells.Length));
+
                         foreach (var cell in row.Cells)
                         {
                             if (cell != null)
                             {
                                 if (iRow == 0)//GetHeaders
                                 {
-                                    Logger.Log(string.Format("Found attribute {0}. ", cell.Text));
+                                    Logger.Log(Level.Info, string.Format("Found attribute {0}. ", cell.Text));
                                     attributes.Add(iCell, cell.Text.Replace(" ", string.Empty));
                                     if (cell.Text.ToLowerInvariant() == "text")
                                     {
-                                        Logger.Log(string.Format("Found text cell @ column {0}. ", iCell));
+                                        Logger.Log(Level.Info, string.Format("Found text cell @ column {0}. ", iCell));
                                         iTextCell = iCell;
                                     }
                                 }
                                 else if (iCell == iTextCell && !String.IsNullOrEmpty(cell.Text))
-                                    text.Content = string.Format("{0}{1}{0}", Environment.NewLine, cell.Text);
+                                    text.Content = Regex.Replace(cell.Text, @"[ ]{2,}", " "); //Replace multiple spaces with one
                                 else
                                     text.Attributes.Add(attributes[iCell], cell.Text);
                             }
