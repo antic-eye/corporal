@@ -93,11 +93,11 @@ namespace Corporal
 
                 int iActCount = 0;
                 int iCurrentText = 0;
-                int iTokenCount = 0;
                 using (XmlWriter writer = XmlWriter.Create(outputFile, settings))
                 {
                     writer.WriteStartDocument();
                     writer.WriteStartElement("corpus");
+                    writer.WriteAttributeString("tokenCount", this.tokenCount.ToString());
                     Logger.Log(Level.Info, string.Format("Converting {0} texts", this.texts.Count));
 
                     foreach (Text text in this.texts)
