@@ -41,38 +41,102 @@ namespace Corporal
         /// </summary>
         /// <param name="path">Path to save the xml file to.</param>
         /// <returns>false on error</returns>
-        public bool ToXml(string path)
+        public bool ToXml(string inputFile)
         {
-            Logger.Log(string.Format("Writing document {0}", path));
+            Stopwatch watch = new Stopwatch();
+            watch.Start();
+            DateTime loop = DateTime.Now;
+
+            string outputFile = string.Format("{0}\\{1}.xml", 
+                Path.GetDirectoryName(inputFile), Path.GetFileNameWithoutExtension(inputFile));
+
+            List<SpeechAct> acts = null;
+            try {
+                if (Directory.Exists(Path.GetDirectoryName(inputFile) + @"\speech-acts"))
+                {
+                    Logger.Log(Level.Info, "Found speech-acts directory, parsing acts.");
+                    acts = SpeechAct.Regexify(Path.GetDirectoryName(inputFile) + @"\speech-acts");
+                    if (acts.Count()>0)
+                        Logger.Log(Level.Info, string.Format("Parsed {0} speech acts.", acts.Count()));
+                }
+            }
+            catch(Exception ex) { Logger.Log(ex); }
+
+            Logger.Log(Level.Info, string.Format("Writing document {0}", outputFile));
 
             try
             {
                 XmlWriterSettings settings = new XmlWriterSettings();
                 settings.Indent = true;
                 settings.NewLineChars = Environment.NewLine;
-                settings.NewLineHandling = NewLineHandling.None;
+                settings.NewLineHandling = NewLineHandling.Replace;
+                settings.NewLineOnAttributes = true;
                 settings.WriteEndDocumentOnClose = true;
                 settings.Encoding = Encoding.UTF8;
 
-                using (XmlWriter writer = XmlWriter.Create(path, settings))
+                int iActCount = 0;
+                int iCurrentText = 0;
+                int iTokenCount = 0;
+                using (XmlWriter writer = XmlWriter.Create(outputFile, settings))
                 {
                     writer.WriteStartDocument();
                     writer.WriteStartElement("corpus");
-                    Logger.Log(string.Format("Converting {0} texts", this.texts.Count));
+                    Logger.Log(Level.Info, string.Format("Converting {0} texts", this.texts.Count));
 
                     foreach (Text text in this.texts)
                     {
+                        iCurrentText++;
+
+                        if ((DateTime.Now - loop) > new TimeSpan(0, 0, 3))
+                        {
+                            Logger.Log(Level.Info, string.Format("Processing text {0}, {1} texts left.", 
+                                iCurrentText, this.texts.Count - iCurrentText));
+                            loop = DateTime.Now;
+                        }
+
+                        if (string.IsNullOrEmpty(text.Content))
+                            continue;
+
                         Logger.Log(string.Format("Adding text  {0}", text.Attributes["id"]));
 
                         writer.WriteStartElement("text");
                         foreach (DictionaryEntry attr in text.Attributes)
+                        {
                             writer.WriteAttributeString(attr.Key.ToString(), attr.Value.ToString());
-                        writer.WriteString(Environment.NewLine);
-                        writer.WriteString(text.Content);
+                        }
+                        //writer.WriteString(Environment.NewLine);
+
+                        if (null != acts)
+                        {
+                            bool bAct = false;
+                            foreach (SpeechAct act in acts)
+                            {
+                                foreach (string pattern in act.Sentences)
+                                {
+                                    Regex reg = new Regex(pattern);
+                                    Match m = reg.Match(text.Content);
+                                    if (m.Success)
+                                    {
+                                        writer.WriteStartElement("speechact");
+                                        writer.WriteAttributeString("name", act.Act);
+                                        writer.WriteString(m.Value);
+                                        writer.WriteEndElement();
+                                        bAct = true;
+                                    }
+                                }
+                            }
+                            if(bAct)
+                                iActCount++;
+                        }
+                        writer.WriteString(text.Content.Replace(" ", Environment.NewLine));
                         writer.WriteEndElement();
                     }
                 }
-                Logger.Log(string.Format("XML file has been written to {0}", path));
+                watch.Stop();
+                Logger.Log(Level.Info, string.Format("XML file has been written to {0}", outputFile));
+                if (null != acts)
+                    Logger.Log(Level.Info, string.Format("{0} texts contained speech acts", iActCount));
+                Logger.Log(Level.Info, string.Format("Conversion took {0}s", watch.Elapsed.TotalSeconds));
                 return true;
             }
             catch (Exception ex)

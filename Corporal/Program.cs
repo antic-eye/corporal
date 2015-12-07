@@ -70,7 +70,7 @@ namespace Corporal
                 if (!FillCorpus())
                     Environment.ExitCode = 403;
                 else
-                    corpus.ToXml(inputFile + ".xml");
+                    corpus.ToXml(inputFile);
             }
 
             Logger.Log(string.Format("Exiting with: " + Environment.ExitCode));
