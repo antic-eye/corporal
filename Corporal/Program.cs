@@ -20,7 +20,7 @@ namespace Corporal
         private static string inputFile = null;
         private static bool verbose = false;
         private static bool tag = false;
-        private static Corpus corpus = new Corpus();
+        private static Corpus corpus;
 
         public static void Main(string[] args)
         {
@@ -69,7 +69,7 @@ namespace Corporal
                     Logger.DebugOn();
 
                 Logger.Log(string.Format("Reading document {0}", inputFile));
-                if (!FillCorpus())
+                if (!FillCorpus(inputFile))
                     Environment.ExitCode = 403;
                 else
                     corpus.ToXml(inputFile);
@@ -122,8 +122,9 @@ Y8b  d8 `8b  d8' 88 `88. 88      `8b  d8' 88 `88. 88   88 88booo.
 ");
         }
 
-        private static bool FillCorpus()
+        private static bool FillCorpus(string inputFile)
         {
+            corpus = new Corpus(Path.GetFileName(inputFile));
             corpus.Attributes.Add("created", DateTime.Now);
             corpus.Attributes.Add("author", Environment.UserName);
 

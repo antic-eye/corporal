@@ -25,6 +25,8 @@ namespace Corporal
         private Hashtable attributes = new Hashtable();
         private TrulyObservableCollection<Text> texts = new TrulyObservableCollection<Text>();
         private int tokenCount = 0;
+        private string name;
+
         /// <summary>
         /// COntains metadata of the corpus
         /// </summary>
@@ -43,8 +45,9 @@ namespace Corporal
                 this.texts = value;
             }
         }
-        public Corpus()
+        public Corpus(string name)
         {
+            this.name = name;
             texts.CollectionChanged += Texts_CollectionChanged;
         }
 
@@ -56,7 +59,8 @@ namespace Corporal
         /// <summary>
         /// Save texts to a xml file
         /// </summary>
-        /// <param name="path">Path to save the xml file to.</param>
+        /// The output xml file will be saved next to the input file with a .xml extension
+        /// <param name="inputFile">Path to the input file.</param>
         /// <returns>false on error</returns>
         public bool ToXml(string inputFile)
         {
