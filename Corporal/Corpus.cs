@@ -26,7 +26,8 @@ namespace Corporal
         private TrulyObservableCollection<Text> texts = new TrulyObservableCollection<Text>();
         private int tokenCount = 0;
         private string name;
-
+        private List<SpeechAct> acts = new List<SpeechAct>();
+        private string actDir;
         /// <summary>
         /// COntains metadata of the corpus
         /// </summary>
@@ -45,6 +46,15 @@ namespace Corporal
                 this.texts = value;
             }
         }
+        public string SpeechActDir
+        {
+            get { return this.actDir; }
+            set
+            {
+                this.actDir = value;
+                this.GetSpeechActs();
+            }
+        }
         public Corpus(string name)
         {
             this.name = name;
@@ -56,32 +66,38 @@ namespace Corporal
             tokenCount = this.texts.Sum(x => x.TokenCount);
         }
 
+        public bool ToXml(string inputFile)
+        {
+            return ToXml(inputFile, Path.GetDirectoryName(inputFile));
+        }
+        private void GetSpeechActs()
+        {
+            try
+            {
+                if (Directory.Exists(Path.GetDirectoryName(this.actDir)))
+                {
+                    Logger.Log(Level.Info, "Found speech-acts directory, parsing acts.");
+                    acts = SpeechAct.Regexify(this.actDir);
+                    if (acts.Count() > 0)
+                        Logger.Log(Level.Info, string.Format("Parsed {0} speech acts.", acts.Count()));
+                }
+            }
+            catch (Exception ex) { Logger.Log(ex); }
+        }
         /// <summary>
         /// Save texts to a xml file
         /// </summary>
         /// The output xml file will be saved next to the input file with a .xml extension
         /// <param name="inputFile">Path to the input file.</param>
         /// <returns>false on error</returns>
-        public bool ToXml(string inputFile)
+        public bool ToXml(string inputFile, string outputFolder)
         {
             Stopwatch watch = new Stopwatch();
             watch.Start();
             DateTime loop = DateTime.Now;
 
-            string outputFile = string.Format("{0}\\{1}.xml", 
-                Path.GetDirectoryName(inputFile), Path.GetFileNameWithoutExtension(inputFile));
-
-            List<SpeechAct> acts = null;
-            try {
-                if (Directory.Exists(Path.GetDirectoryName(inputFile) + @"\speech-acts"))
-                {
-                    Logger.Log(Level.Info, "Found speech-acts directory, parsing acts.");
-                    acts = SpeechAct.Regexify(Path.GetDirectoryName(inputFile) + @"\speech-acts");
-                    if (acts.Count()>0)
-                        Logger.Log(Level.Info, string.Format("Parsed {0} speech acts.", acts.Count()));
-                }
-            }
-            catch(Exception ex) { Logger.Log(ex); }
+            string outputFile = string.Format("{0}\\{1}.xml",
+                outputFolder, Path.GetFileNameWithoutExtension(inputFile));
 
             Logger.Log(Level.Info, string.Format("Writing document {0}", outputFile));
 

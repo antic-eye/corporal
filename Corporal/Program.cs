@@ -18,6 +18,9 @@ namespace Corporal
     {
         private static Queue<Task> queue = new Queue<Task>();
         private static string inputFile = null;
+        private static string directoryInput = null;
+        private static string directoryOut = null;
+        private static string speechActs = null;
         private static bool verbose = false;
         private static bool tag = false;
         private static Corpus corpus;
@@ -47,13 +50,25 @@ namespace Corporal
                     .WithSwitch("v", () => verbose = true)
                         .HavingLongAlias("verbose")
                         .DescribedBy("enables verbose output")
+                    .WithNamed("d", d => directoryInput = d)
+                        .HavingLongAlias("directory")
+                        .DescribedBy("Input path", "specifies the path to a collection of xslx files to process.")
+                    .WithNamed("o", o => directoryOut = o)
+                        .HavingLongAlias("out")
+                        .DescribedBy("Ouput path", "specifies the path where to save resulting xml files to.")
+                    .WithNamed("s", s => speechActs = s)
+                        .HavingLongAlias("speech-acts")
+                        .DescribedBy("Speech Act Dir", "specifies the path to speech-act databases (*.dat).")
                 .BuildConfiguration();
             var parser = new CommandLineParser(configuration);
 
             var parseResult = parser.Parse(args);
 
             if (!parseResult.Succeeded)
+            {
                 ShowUsage(configuration, parseResult);
+                Logger.Log(Level.Error, parseResult.Message);
+            }
             else if (!File.Exists(inputFile))
             {
                 Logger.Log(Logger.Level.Error,
@@ -68,15 +83,31 @@ namespace Corporal
                 else
                     Logger.DebugOn();
 
-                Logger.Log(string.Format("Reading document {0}", inputFile));
-                if (!FillCorpus(inputFile))
-                    Environment.ExitCode = 403;
+                if (!string.IsNullOrEmpty(directoryInput))
+                {
+                    Logger.Log(string.Format("Reading directory {0}", directoryInput));
+                    foreach (string sFile in Directory.GetFiles(directoryInput, "*.xlsx"))
+                    {
+                        Logger.Log(string.Format("Reading document {0}", inputFile));
+                        if (!FillCorpus(sFile))
+                            Environment.ExitCode = 403;
+                        else
+                            corpus.ToXml(sFile, (string.IsNullOrEmpty(directoryOut)) ? null : directoryOut);
+                    }
+                }
                 else
-                    corpus.ToXml(inputFile);
+                {
+                    Logger.Log(string.Format("Reading document {0}", inputFile));
+                    if (!FillCorpus(inputFile))
+                        Environment.ExitCode = 403;
+                    else
+                        corpus.ToXml(inputFile);
+                }
             }
 
             Logger.Log(string.Format("Exiting with: " + Environment.ExitCode));
 #if DEBUG
+            Console.WriteLine("Done.");
             Console.ReadLine();
 #endif
         }
@@ -125,6 +156,8 @@ Y8b  d8 `8b  d8' 88 `88. 88      `8b  d8' 88 `88. 88   88 88booo.
         private static bool FillCorpus(string inputFile)
         {
             corpus = new Corpus(Path.GetFileName(inputFile));
+            if (null != speechActs)
+                corpus.SpeechActDir = speechActs;
             corpus.Attributes.Add("created", DateTime.Now);
             corpus.Attributes.Add("author", Environment.UserName);
 
