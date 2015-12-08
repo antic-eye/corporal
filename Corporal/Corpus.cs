@@ -55,6 +55,14 @@ namespace Corporal
                 this.GetSpeechActs();
             }
         }
+        public List<SpeechAct> SpeechActs
+        {
+            get { return this.acts; }
+        }
+        public int TokenCount
+        {
+            get { return this.tokenCount; }
+        }
         public Corpus(string name)
         {
             this.name = name;
@@ -116,58 +124,7 @@ namespace Corporal
                 using (XmlWriter writer = XmlWriter.Create(outputFile, settings))
                 {
                     writer.WriteStartDocument();
-                    writer.WriteStartElement("corpus");
-                    writer.WriteAttributeString("tokenCount", this.tokenCount.ToString());
-                    Logger.Log(Level.Info, string.Format("Converting {0} texts", this.texts.Count));
-
-                    foreach (Text text in this.texts)
-                    {
-                        iCurrentText++;
-
-                        if ((DateTime.Now - loop) > new TimeSpan(0, 0, 3))
-                        {
-                            Logger.Log(Level.Info, string.Format("Processing text {0}, {1} texts left.", 
-                                iCurrentText, this.texts.Count - iCurrentText));
-                            loop = DateTime.Now;
-                        }
-
-                        if (string.IsNullOrEmpty(text.Content))
-                            continue;
-
-                        Logger.Log(string.Format("Adding text  {0}", text.Attributes["id"]));
-
-                        writer.WriteStartElement("text");
-                        foreach (DictionaryEntry attr in text.Attributes)
-                        {
-                            writer.WriteAttributeString(attr.Key.ToString(), attr.Value.ToString());
-                        }
-                        //writer.WriteString(Environment.NewLine);
-
-                        if (null != acts)
-                        {
-                            bool bAct = false;
-                            foreach (SpeechAct act in acts)
-                            {
-                                foreach (string pattern in act.Sentences)
-                                {
-                                    Regex reg = new Regex(pattern);
-                                    Match m = reg.Match(text.Content);
-                                    if (m.Success)
-                                    {
-                                        writer.WriteStartElement("speechact");
-                                        writer.WriteAttributeString("name", act.Act);
-                                        writer.WriteString(m.Value);
-                                        writer.WriteEndElement();
-                                        bAct = true;
-                                    }
-                                }
-                            }
-                            if(bAct)
-                                iActCount++;
-                        }
-                        writer.WriteString(text.Content.Replace(" ", Environment.NewLine));
-                        writer.WriteEndElement();
-                    }
+                    Corpus2Xml(this, ref loop, ref iActCount, ref iCurrentText, writer, acts);
                 }
                 watch.Stop();
                 Logger.Log(Level.Info, string.Format("XML file has been written to {0}", outputFile));
@@ -180,6 +137,59 @@ namespace Corporal
             {
                 Logger.Log(Logger.Level.Error, string.Format("Exception during xml generation: {0}", ex.Message));
                 return false;
+            }
+        }
+
+        public static void Corpus2Xml(Corpus corpus, ref DateTime loop, ref int iActCount, ref int iCurrentText, XmlWriter writer, List<SpeechAct> acts)
+        {
+            writer.WriteStartElement("corpus");
+            writer.WriteAttributeString("tokenCount", corpus.tokenCount.ToString());
+            Logger.Log(Level.Info, string.Format("Converting {0} texts", corpus.texts.Count));
+
+            foreach (Text text in corpus.texts)
+            {
+                iCurrentText++;
+
+                if ((DateTime.Now - loop) > new TimeSpan(0, 0, 3))
+                {
+                    Logger.Log(Level.Info, string.Format("Processing text {0}, {1} texts left.",
+                        iCurrentText, corpus.texts.Count - iCurrentText));
+                    loop = DateTime.Now;
+                }
+
+                if (string.IsNullOrEmpty(text.Content))
+                    continue;
+
+                Logger.Log(string.Format("Adding text  {0}", text.Attributes["id"]));
+
+                writer.WriteStartElement("text");
+                foreach (DictionaryEntry attr in text.Attributes)
+                    writer.WriteAttributeString(attr.Key.ToString(), attr.Value.ToString());
+
+                if (null != acts)
+                {
+                    bool bAct = false;
+                    foreach (SpeechAct act in acts)
+                    {
+                        foreach (string pattern in act.Sentences)
+                        {
+                            Regex reg = new Regex(pattern);
+                            Match m = reg.Match(text.Content);
+                            if (m.Success)
+                            {
+                                writer.WriteStartElement("speechact");
+                                writer.WriteAttributeString("name", act.Act);
+                                writer.WriteString(m.Value);
+                                writer.WriteEndElement();
+                                bAct = true;
+                            }
+                        }
+                    }
+                    if (bAct)
+                        iActCount++;
+                }
+                writer.WriteString(text.Content.Replace(" ", Environment.NewLine));
+                writer.WriteEndElement();
             }
         }
     }

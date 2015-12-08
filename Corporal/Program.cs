@@ -23,6 +23,7 @@ namespace Corporal
         private static string speechActs = null;
         private static bool verbose = false;
         private static bool tag = false;
+        private static bool singleCorpus = false;
         private static Corpus corpus;
 
         public static void Main(string[] args)
@@ -42,11 +43,13 @@ namespace Corporal
                 .Create()
                     .WithNamed("f", v => inputFile = v)
                         .HavingLongAlias("file")
-                        .Required()
                         .DescribedBy("Input File", "specifies the input file to parse.")
                     .WithSwitch("t", () => tag = true)
                         .HavingLongAlias("tag")
                         .DescribedBy("Tag your texts using TreeTagger")
+                    .WithSwitch("c", () => singleCorpus = true)
+                        .HavingLongAlias("single-corpus")
+                        .DescribedBy("Create a single corpus file in recursive mode.")
                     .WithSwitch("v", () => verbose = true)
                         .HavingLongAlias("verbose")
                         .DescribedBy("enables verbose output")
@@ -69,10 +72,17 @@ namespace Corporal
                 ShowUsage(configuration, parseResult);
                 Logger.Log(Level.Error, parseResult.Message);
             }
-            else if (!File.Exists(inputFile))
+            else if (null != inputFile && !File.Exists(inputFile))
             {
                 Logger.Log(Logger.Level.Error,
                     string.Format("The file {0} does not exist, I'm out.", inputFile));
+                ShowUsage(configuration, parseResult);
+                Environment.ExitCode = -2;
+            }
+            else if (null != directoryInput && !Directory.Exists(directoryInput))
+            {
+                Logger.Log(Logger.Level.Error,
+                    string.Format("The directory {0} does not exist, I'm out.", directoryInput));
                 ShowUsage(configuration, parseResult);
                 Environment.ExitCode = -2;
             }
@@ -86,19 +96,66 @@ namespace Corporal
                 if (!string.IsNullOrEmpty(directoryInput))
                 {
                     Logger.Log(string.Format("Reading directory {0}", directoryInput));
-                    foreach (string sFile in Directory.GetFiles(directoryInput, "*.xlsx"))
+
+                    if (singleCorpus)
                     {
-                        Logger.Log(string.Format("Reading document {0}", inputFile));
-                        if (!FillCorpus(sFile))
-                            Environment.ExitCode = 403;
-                        else
+                        Logger.Log("Generating single corpus");
+                        List<Corpus> corpses = new List<Corpus>();
+                        foreach (string sFile in Directory.GetFiles(directoryInput, "*.xlsx"))
+                        {
+                            Logger.Log(string.Format("Reading document {0}", sFile));
+                            Corpus corp = new Corpus(Path.GetFileName(sFile));
+                            corp = FillCorpus(sFile, corp);
+                            if (null == corp)
+                                Environment.ExitCode = 403;
+                            else
+                                corpses.Add(corp);
+                        }
+
+                        string outputFile = string.Format("{0}\\{1}.xml",
+                            (!string.IsNullOrEmpty(directoryOut)) ? directoryOut : Path.GetDirectoryName(inputFile),
+                            Path.GetFileNameWithoutExtension(inputFile));
+
+                        XmlWriterSettings settings = new XmlWriterSettings();
+                        settings.Indent = true;
+                        settings.NewLineChars = Environment.NewLine;
+                        settings.NewLineHandling = NewLineHandling.Replace;
+                        settings.NewLineOnAttributes = true;
+                        settings.WriteEndDocumentOnClose = true;
+                        settings.Encoding = Encoding.UTF8;
+
+                        int iActCount = 0;
+                        int iCurrentText = 0;
+                        DateTime loop = DateTime.Now;
+                        using (XmlWriter writer = XmlWriter.Create(outputFile, settings))
+                        {
+                            writer.WriteStartDocument();
+                            writer.WriteStartElement("bodies");
+                            writer.WriteAttributeString("tokenCount", corpses.Sum(x => x.TokenCount).ToString());
+                            foreach (Corpus corp in corpses)
+                            {
+                                Corpus.Corpus2Xml(corp, ref loop, ref iActCount, ref iCurrentText, writer, corp.SpeechActs);
+                            }
+                            writer.WriteEndElement();
+                        }
+                    }
+                    else
+                    {
+                        foreach (string sFile in Directory.GetFiles(directoryInput, "*.xlsx"))
+                        {
+                            Logger.Log(string.Format("Reading document {0}", sFile));
+                            corpus = FillCorpus(sFile, corpus);
+                            if (null == corpus)
+                                Environment.ExitCode = 403;
                             corpus.ToXml(sFile, (string.IsNullOrEmpty(directoryOut)) ? null : directoryOut);
+                        }
                     }
                 }
                 else
                 {
                     Logger.Log(string.Format("Reading document {0}", inputFile));
-                    if (!FillCorpus(inputFile))
+                    corpus = FillCorpus(inputFile, corpus);
+                    if (null == corpus)
                         Environment.ExitCode = 403;
                     else
                         corpus.ToXml(inputFile);
@@ -153,7 +210,7 @@ Y8b  d8 `8b  d8' 88 `88. 88      `8b  d8' 88 `88. 88   88 88booo.
 ");
         }
 
-        private static bool FillCorpus(string inputFile)
+        private static Corpus FillCorpus(string inputFile, Corpus corpus)
         {
             corpus = new Corpus(Path.GetFileName(inputFile));
             if (null != speechActs)
@@ -206,10 +263,10 @@ Y8b  d8 `8b  d8' 88 `88. 88      `8b  d8' 88 `88. 88   88 88booo.
             catch (IOException ex)
             {
                 Logger.Log(ex);
-                return false;
+                return null;
             }
             Logger.Log("Finished reading excel file.");
-            return true;
+            return corpus;
         }
 
         private static void ShowUsage(CommandLineConfiguration configuration, ParseResult parseResult)
