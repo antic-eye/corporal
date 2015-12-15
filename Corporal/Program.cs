@@ -10,6 +10,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Xml;
+using System.Xml.Serialization;
 using static SimpleLogger.Logger;
 
 namespace Corporal
@@ -24,7 +25,9 @@ namespace Corporal
         private static bool verbose = false;
         private static bool tag = false;
         private static bool singleCorpus = false;
+        private static bool regex = false;
         private static Corpus corpus;
+        private static string cacheFile;
 
         public static void Main(string[] args)
         {
@@ -62,15 +65,25 @@ namespace Corporal
                     .WithNamed("s", s => speechActs = s)
                         .HavingLongAlias("speech-acts")
                         .DescribedBy("Speech Act Dir", "specifies the path to speech-act databases (*.dat).")
+                    .WithNamed("p", p => cacheFile = p)
+                        .HavingLongAlias("pattern-file")
+                        .DescribedBy("Pattern file", "Load precompiled expressions from pattern file.")
                 .BuildConfiguration();
             var parser = new CommandLineParser(configuration);
 
             var parseResult = parser.Parse(args);
 
+            if (string.IsNullOrEmpty(cacheFile))
+                cacheFile = Path.GetTempFileName() + ".xml";
+
             if (!parseResult.Succeeded)
             {
                 ShowUsage(configuration, parseResult);
                 Logger.Log(Level.Error, parseResult.Message);
+            }
+            else if (regex)
+            {
+
             }
             else if (null != inputFile && !File.Exists(inputFile))
             {
@@ -284,5 +297,117 @@ Y8b  d8 `8b  d8' 88 `88. 88      `8b  d8' 88 `88. 88   88 88booo.
             Environment.ExitCode = -1;
 #endif
         }
+
+        public static void ToXml(string filePath)
+        {
+            List<SpeechAct> acts = Regexify(speechActs);
+
+            XmlWriterSettings settings = new XmlWriterSettings();
+            settings.Indent = true;
+            settings.NewLineChars = Environment.NewLine;
+            settings.NewLineHandling = NewLineHandling.Replace;
+            settings.NewLineOnAttributes = true;
+            settings.WriteEndDocumentOnClose = true;
+            settings.Encoding = Encoding.UTF8;
+
+            using (XmlWriter writer = XmlWriter.Create(filePath, settings))
+            {
+                writer.WriteStartDocument();
+                writer.WriteStartElement("acts");
+                writer.WriteAttributeString("timeStamp", DateTime.Now.ToString());
+
+                foreach (SpeechAct act in acts)
+                {
+                    writer.WriteStartElement("acts");
+                    writer.WriteAttributeString("name", act.Act);
+                    writer.WriteAttributeString("taxonomie", act.Tax);
+                    writer.WriteAttributeString("emotional", act.IsEmotional.ToString());
+
+                    foreach (string pattern in act.Sentences)
+                    {
+                        writer.WriteStartElement("pattern");
+                        //writer.WriteAttributeString("name", act.Sentences);
+                        writer.WriteString(pattern);
+                        writer.WriteEndElement();
+                    }
+                    writer.WriteEndElement();
+                }
+                writer.WriteEndElement();
+            }
+        }
+        public static List<SpeechAct> Regexify(string Directory)
+        {
+            if (!string.IsNullOrEmpty(cacheFile))
+            {
+                if(File.Exists(cacheFile))
+                {
+                    Logger.Log(string.Format("Found precompiled speech-acts @{0}", cacheFile));
+                    var serializer = new XmlSerializer(typeof(List<SpeechAct>));
+                    using (TextReader reader = new StreamReader(cacheFile))
+                    {
+                        Logger.Log("Speech-acts deserialized, using them, skipping preparation.");
+                        return (List<SpeechAct>)serializer.Deserialize(reader);
+                    }
+                }
+            }
+
+            List<SpeechAct> acts = new List<SpeechAct>();
+            foreach (FileInfo file in new DirectoryInfo(Directory).GetFiles("*.dat"))
+            {
+                XmlDocument doc = new XmlDocument();
+                doc.Load(file.FullName);
+                XmlNode node = doc.DocumentElement.SelectSingleNode("/list/header/speechact_type");
+                SpeechAct act = new SpeechAct(node.InnerText);
+                act.Tax = doc.DocumentElement.SelectSingleNode("/list/header/taxonomie").InnerText;
+                foreach (string s in doc.DocumentElement.SelectSingleNode("/list/body").InnerText.Split(Environment.NewLine.ToCharArray()))
+                {
+                    if (!string.IsNullOrEmpty(s))
+                        try
+                        {
+                            act.Sentences.Add(Prepare(s));
+                        }
+                        catch (IsSingleWordOnlyException word)
+                        {
+                            // Allow whitespaces before and after single words
+                            // prevent i.e. "ah" matched in "Zahn"
+                            act.Sentences.Add("[, ;]?[ ]+" + word.Word + "$");
+                            act.Sentences.Add("^|[ ]" + word.Word + "[ ]+[, ;]?");
+                        }
+                }
+                acts.Add(act);
+            }
+            if (!string.IsNullOrEmpty(cacheFile))
+            {
+                var aSerializer = new XmlSerializer(typeof(List<SpeechAct>));
+
+                using (TextWriter sw = new StreamWriter(cacheFile))
+                {
+                    aSerializer.Serialize(sw, acts); // pass an instance of A
+                    sw.WriteLine();
+                }
+                Logger.Log("Saved precompiled list of speech-acts to " + cacheFile);
+            }
+            return acts;
+        }
+        private static string Prepare(string sentence)
+        {
+            sentence.Trim();
+            SimpleLogger.Logger.Log(string.Format("Preparing sentence\"{0}\"", sentence));
+            // convert matching syntax to regex
+            sentence = Regex.Replace(sentence, @"[ ]+\.{1,3}$+", @" [A-Za-z0-9\ ]*");
+            sentence = Regex.Replace(sentence, @"^\.{1,3}[ ]+", @"[A-Za-z0-9\ ]* ");
+            sentence = Regex.Replace(sentence, @"[ ]+\.{1,3}[ ]+", @" [A-Za-z0-9\ ]* ");
+            sentence = Regex.Replace(sentence, @"[ ]?([\?\!])", @"[ ]?\$1[ ]?");// Mask Questions and !
+
+            // make common mistakes more fuzzy
+            sentence = Regex.Replace(sentence, @"\,[ ]?dass[ ]?", @"\,[ ]?da[s]?[ß]?[ss]?[ ]?");
+            sentence = Regex.Replace(sentence, @"[ ]*\,[ ]*", @"[ ]?\,[ ]?");
+
+            if (sentence.IndexOf(' ') == -1)
+                throw new IsSingleWordOnlyException(sentence);
+
+            return sentence;
+        }
+
     }
 }

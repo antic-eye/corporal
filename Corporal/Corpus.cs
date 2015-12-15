@@ -78,14 +78,14 @@ namespace Corporal
         {
             return ToXml(inputFile, Path.GetDirectoryName(inputFile));
         }
-        private void GetSpeechActs()
+        private void GetSpeechActs(string serializeIt="")
         {
             try
             {
                 if (Directory.Exists(Path.GetDirectoryName(this.actDir)))
                 {
                     Logger.Log(Level.Info, "Found speech-acts directory, parsing acts.");
-                    acts = SpeechAct.Regexify(this.actDir);
+                    acts = Program.Regexify(this.actDir);
                     if (acts.Count() > 0)
                         Logger.Log(Level.Info, string.Format("Parsed {0} speech acts.", acts.Count()));
                 }
@@ -179,6 +179,8 @@ namespace Corporal
                             {
                                 writer.WriteStartElement("speechact");
                                 writer.WriteAttributeString("name", act.Act);
+                                writer.WriteAttributeString("pattern", pattern);
+                                writer.WriteAttributeString("emotional", act.IsEmotional.ToString());
                                 writer.WriteString(m.Value);
                                 writer.WriteEndElement();
                                 bAct = true;
