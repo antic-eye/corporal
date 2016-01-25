@@ -181,6 +181,7 @@ namespace Corporal
                                 writer.WriteAttributeString("name", act.Act);
                                 writer.WriteAttributeString("pattern", pattern);
                                 writer.WriteAttributeString("emotional", act.IsEmotional.ToString());
+                                writer.WriteAttributeString("assessment", act.IsComment.ToString());
                                 writer.WriteString(m.Value);
                                 writer.WriteEndElement();
                                 bAct = true;

@@ -17,6 +17,7 @@ namespace Corporal
         private string tax;
         private List<string> sentences = new List<string>();
         private bool emotional;
+        private bool comment;
         public string Act { get { return this.act; } set { this.act = value; } }
         public string Tax
         {
@@ -26,6 +27,8 @@ namespace Corporal
                 this.tax = value;
                 if (null != this.tax && this.tax.ToLowerInvariant() == "gefühlsausdruck")
                     this.emotional = true;
+                if (null != this.tax && (this.tax.ToLowerInvariant().Contains("bewertung") || this.tax.ToLowerInvariant().Contains("kommentar")))
+                    this.comment = true;
             }
         }
         public List<string> Sentences { get { return this.sentences; } set { this.sentences = value; } }
@@ -33,6 +36,11 @@ namespace Corporal
         {
             get { return this.emotional; }
             set { this.emotional = value; }
+        }
+        public bool IsComment
+        {
+            get { return this.comment; }
+            set { this.comment = value; }
         }
         public SpeechAct()
         {
