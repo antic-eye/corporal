@@ -252,7 +252,9 @@ Y8b  d8 `8b  d8' 88 `88. 88      `8b  d8' 88 `88. 88   88 88booo.
                                 if (iRow == 0)//GetHeaders
                                 {
                                     Logger.Log(Level.Info, string.Format("Found attribute {0}. ", cell.Text));
-                                    attributes.Add(iCell, cell.Text.Replace(" ", string.Empty));
+                                    string sCellText = ProcessAttributeNames(cell);
+
+                                    attributes.Add(iCell, sCellText);
                                     if (cell.Text.ToLowerInvariant() == "text")
                                     {
                                         Logger.Log(Level.Info, string.Format("Found text cell @ column {0}. ", iCell));
@@ -280,6 +282,20 @@ Y8b  d8 `8b  d8' 88 `88. 88      `8b  d8' 88 `88. 88   88 88booo.
             }
             Logger.Log("Finished reading excel file.");
             return corpus;
+        }
+        
+        private static string ProcessAttributeNames(Cell cell)
+        {
+            System.Globalization.TextInfo cellInfo = new System.Globalization.CultureInfo("en-US", false).TextInfo;
+            string sCellText = cellInfo.ToTitleCase(cell.Text.Trim());
+            if (sCellText.IndexOf(" ") > 0)
+            {
+                sCellText = sCellText.Replace(" ", string.Empty);
+                sCellText = sCellText[0].ToString().ToLowerInvariant() + sCellText.Substring(1);
+            }
+            else
+                sCellText = sCellText.ToLowerInvariant();
+            return sCellText;
         }
 
         private static void ShowUsage(CommandLineConfiguration configuration, ParseResult parseResult)
